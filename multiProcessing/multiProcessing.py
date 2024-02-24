@@ -1,6 +1,8 @@
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
+from tqdm import tqdm
 import logging
+
 
 class MultiProcessing:
     """
@@ -25,7 +27,7 @@ class MultiProcessing:
         if num_processes < 1:
             raise ValueError('num_processes must be greater than 0.')
         if num_processes > mp.cpu_count():
-            raise ValueError('num_processes must be less than the number of CPUs.')
+            raise ValueError('num_processes must be less than or equal to the number of CPUs.')
         self.__num_processes = num_processes
 
     def _validate_function(self, func):
@@ -43,7 +45,7 @@ class MultiProcessing:
             raise ValueError("The provided function is not callable.")
 
 
-    def run_multiprocess(self, func, args, futures=False, return_results=False):
+    def run_multiprocess(self, func, args, return_results=False):
         """
         Executes the given function in multiple processes.
 
@@ -54,6 +56,8 @@ class MultiProcessing:
                 Defaults to False.
             return_results (bool, optional): Whether to return the results from each process.
                 Defaults to False.
+            callback (callable, optional): A function to call with no arguments after each process completes.
+                Defaults to None.
 
         Returns:
             A list of results (if `return_results` is True) or a list of futures (if `futures` is True).
@@ -62,13 +66,14 @@ class MultiProcessing:
         self._validate_function(func)
 
         with ProcessPoolExecutor(max_workers=self.num_processes) as executor:
-            if __name__ == '__main__':
-                if futures:
-                    return executor.map(func, args)
-                elif return_results:
-                    return [future.result() for future in executor.map(func, args)]
-                else:
-                    executor.map(func, args)
-
-
-
+            try:
+                results = []
+                with tqdm(total=len(args)) as pbar:
+                    for result in executor.map(func, args):
+                        results.append(result)
+                        pbar.update()
+                if return_results:
+                    return results
+            except Exception as e:
+                logging.error(e)
+                raise e
